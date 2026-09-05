@@ -54,7 +54,7 @@ async function loadActiveRules(env: WorkerEnv): Promise<RuleRow[]> {
 function createServer(env: WorkerEnv) {
   const server = new McpServer({
     name: "a-hairline-crack-mcp",
-    version: "0.3.0"
+    version: "0.3.1"
   });
 
   server.registerTool(
@@ -128,6 +128,33 @@ export default {
       return Response.json({ ok: true, service: "a-hairline-crack-mcp" });
     }
 
+    // Temporary diagnostic. Returns metadata only, never rule contents or secrets.
+    if (url.pathname === "/health/supabase") {
+      try {
+        const rows = await loadActiveRules(env);
+        return Response.json(
+          {
+            ok: true,
+            source: "supabase",
+            active_rule_count: rows.length,
+            keys: rows.map((row) => row.meta_key)
+          },
+          { headers: { "Cache-Control": "no-store" } }
+        );
+      } catch (error) {
+        return Response.json(
+          {
+            ok: false,
+            error: error instanceof Error ? error.message : "Unknown Supabase error"
+          },
+          {
+            status: 503,
+            headers: { "Cache-Control": "no-store" }
+          }
+        );
+      }
+    }
+
     if (url.pathname === "/mcp") {
       if (!env.MCP_SHARED_SECRET) {
         return Response.json(
@@ -149,6 +176,7 @@ export default {
       service: "a-hairline-crack-mcp",
       mcp: "/mcp",
       health: "/health",
+      supabase_health: "/health/supabase",
       auth: "bearer"
     });
   }
