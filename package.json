@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "wrangler deploy --dry-run",
     "check": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy"
   },
