@@ -6,5 +6,15 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
-  }
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkflowStatusDO"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["WorkflowStatusDO"]
+    }
+  ]
 }
