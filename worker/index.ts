@@ -3,12 +3,58 @@ import { createMcpHandler } from "agents/mcp/server";
 
 type WorkerEnv = {
   MCP_SHARED_SECRET?: string;
+  SUPABASE_SECRET_KEY?: string;
 };
 
-function createServer() {
+type RuleRow = {
+  meta_key: string;
+  meta_value: unknown;
+  updated_at: string;
+};
+
+const SUPABASE_URL = "https://agmwevkhgkggkgmfyeyj.supabase.co";
+const SUPABASE_SCHEMA = "growth_boundary_proofing_data";
+const ACTIVE_RULE_KEYS = [
+  "governance_instruction_active_v3",
+  "governance_execution_prompt_active_v3",
+  "governance_workflow_active_v3"
+] as const;
+
+async function loadActiveRules(env: WorkerEnv): Promise<RuleRow[]> {
+  if (!env.SUPABASE_SECRET_KEY) {
+    throw new Error("SUPABASE_SECRET_KEY is not configured");
+  }
+
+  const endpoint = new URL(`${SUPABASE_URL}/rest/v1/correction_meta`);
+  endpoint.searchParams.set("select", "meta_key,meta_value,updated_at");
+  endpoint.searchParams.set("meta_key", `in.(${ACTIVE_RULE_KEYS.join(",")})`);
+  endpoint.searchParams.set("order", "meta_key.asc");
+
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: env.SUPABASE_SECRET_KEY,
+      "Accept-Profile": SUPABASE_SCHEMA,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase read failed (${response.status}): ${detail}`);
+  }
+
+  const rows = (await response.json()) as RuleRow[];
+  if (rows.length !== ACTIVE_RULE_KEYS.length) {
+    throw new Error(`Expected ${ACTIVE_RULE_KEYS.length} ACTIVE rule rows, received ${rows.length}`);
+  }
+
+  return rows;
+}
+
+function createServer(env: WorkerEnv) {
   const server = new McpServer({
     name: "a-hairline-crack-mcp",
-    version: "0.2.0"
+    version: "0.3.0"
   });
 
   server.registerTool(
@@ -26,10 +72,43 @@ function createServer() {
     })
   );
 
+  server.registerTool(
+    "load_rules",
+    {
+      description: "Load the three ACTIVE proofreading governance documents from Supabase in one read-only request"
+    },
+    async () => {
+      try {
+        const rows = await loadActiveRules(env);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                source: "supabase",
+                schema: SUPABASE_SCHEMA,
+                table: "correction_meta",
+                rows
+              })
+            }
+          ]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: error instanceof Error ? error.message : "Unknown Supabase error"
+            }
+          ]
+        };
+      }
+    }
+  );
+
   return server;
 }
-
-const mcpHandler = createMcpHandler(createServer);
 
 function unauthorized(): Response {
   return Response.json(
@@ -62,7 +141,7 @@ export default {
         return unauthorized();
       }
 
-      return mcpHandler(request, env, ctx);
+      return createMcpHandler(() => createServer(env))(request, env, ctx);
     }
 
     return Response.json({
