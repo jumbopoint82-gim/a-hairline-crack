@@ -6,7 +6,9 @@
   "scripts": {
     "build": "wrangler deploy --dry-run",
     "test:read-reliability": "node --experimental-strip-types --test test/read-reliability.test.mjs",
-    "check": "npm run test:read-reliability && wrangler deploy --dry-run",
+    "test:batch-read": "node --experimental-strip-types --test test/batch-read.test.mjs test/single-flight.test.mjs",
+    "test:unit": "node --experimental-strip-types --test test/read-reliability.test.mjs test/batch-read.test.mjs test/single-flight.test.mjs",
+    "check": "npm run test:unit && wrangler deploy --dry-run",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
