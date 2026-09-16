@@ -33,7 +33,10 @@ function toolJson(payload: unknown, isError = false) {
 }
 
 function toolError(error: unknown) {
-  return toolJson({ error: errorMessage(error) }, true);
+  return {
+    isError: true,
+    content: [{ type: "text" as const, text: errorMessage(error) }],
+  };
 }
 
 function prepareManuscript(manuscript: DriveManuscript) {
@@ -45,6 +48,10 @@ function prepareManuscript(manuscript: DriveManuscript) {
     invisibleRemoved: cleanup.invisibleRemoved,
     lineSeparatorsNormalized: cleanup.lineSeparatorsNormalized,
   };
+}
+
+function flattenIntegrationHealth(health: Awaited<ReturnType<typeof integrationHealth>>) {
+  return { ok: health.ok, ...health.integrations };
 }
 
 function batchPayload(batch: Awaited<ReturnType<typeof readDriveManuscriptBatch>>) {
@@ -67,7 +74,7 @@ function createServer(env: WorkerEnv) {
   server.registerTool(
     "health",
     { description: "Check whether the A Hairline Crack MCP server is running" },
-    async () => toolJson({ ok: true, service: "a-hairline-crack-mcp", version: VERSION }),
+    async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
   );
 
   server.registerTool(
@@ -77,7 +84,7 @@ function createServer(env: WorkerEnv) {
         "Probe Supabase, Google Drive and GitHub reads in parallel and report per-integration latency without returning manuscript or secret contents",
     },
     async () => {
-      const health = await integrationHealth(env);
+      const health = flattenIntegrationHealth(await integrationHealth(env));
       return toolJson(health, !health.ok);
     },
   );
@@ -330,7 +337,7 @@ export default {
     }
 
     if (url.pathname === "/health/integrations") {
-      const payload = await integrationHealth(env);
+      const payload = flattenIntegrationHealth(await integrationHealth(env));
       return Response.json(payload, {
         status: payload.ok ? 200 : 503,
         headers: { "Cache-Control": "no-store" },
