@@ -540,7 +540,7 @@ export async function integrationHealth(env: WorkerEnv) {
 
   const integrations = Object.fromEntries(results);
   return {
-    ok: Object.values(integrations).every((value) => value.ok),
+    ok: results.every(([, value]) => value.ok),
     integrations,
   };
 }
