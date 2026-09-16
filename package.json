@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run",
-    "check": "wrangler deploy --dry-run",
+    "test:read-reliability": "node --experimental-strip-types --test test/read-reliability.test.mjs",
+    "check": "npm run test:read-reliability && wrangler deploy --dry-run",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
